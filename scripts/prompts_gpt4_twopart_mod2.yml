@@ -1,0 +1,218 @@
+prompts:
+  summarize: |
+    Objective: Provided between triple backticks is a Liver Radiology Report (MRI) in English and Korean. Translate into English and summarize, and output as JSON. Your output must only be in JSON.
+
+    Task details:
+    1. Identify the index lesion
+     • The index lesion to be analyzed is the largest liver mass. If no size is given, the first described liver mass is the index lesion.
+    2. Relevant text extraction        
+     • Extract only the portion of the input describing the index lesion and its location, the date(s), shape of the liver, risk factors, vessels and thrombi.
+     • ALL of the aforementioned items must be included when possible.
+     • IMPORTANT: The extracted text does not have to be a complete sentence. Only extract descriptors for the index lesion. Delete information concerning other lesions.
+    3. Translation
+     • Translate the extracted text from the previous step into English, using information from "Dictionary".
+     • When extracting descriptions on enhancement, you must not omit the phase. 
+    4. <Manual> for each item
+     1) Current exam date
+      • Possible values: Unknown, or date in yyyy-mm-dd
+     2) Size change rate
+      • If there is no previous study, it is Unknown
+      • If there is a previous study, express as "New in n months" or "m% in n months". If n or m is unknown, it is "Unknown".
+      • Calculate % by comparing the size in mm. 
+     3) Description of index lesion
+      • Location is described as [S1/S2/S3/S4/S5/S6/S7/S8/right/left/left lateral segment/right anterior segment/right posterior segment/right dome/bilateral/...]
+      • When there are multiple sizes from different time points, extract the most recent size.
+     4) Vessels
+      • Descriptors of vessels and thrombi
+      •  AP shunts and hemangiomas are not vessels
+     5) Risk factors
+      • !!IMPORTANT! Not just "chronic liver disease"!!
+      • Look for: cirrhosis, chronic hepatitis B, CHB, HBV
+      • Do not include findings in other organs other than the liver, such as splenomegaly
+      • Do not include: other types of chronic hepatitis (autoimmune hepatitis, hepatitis C), liver disease (alcoholic liver disease)
+    5. Pay close attention to the relevant section in the MANUAL. Double-check the extracted values for each key in the JSON before providing the final output.
+
+    <Dictionary>
+    Korean Dictionary: 과혈관성 = hypervascular, 간암 = Hepatocellular Carcinoma (HCC), 신호강도 = signal intensity, 동맥기 = arterial phase, 문맥기 = portal phase, 지연기 = delayed phase, 20분 지연기 = 간담도기 = hepatobiliary phase, 확산제한 = diffusion restriction, 매우 밝음 = markedly high, 조영증강 = enhancement, 배제할 수 없음 = 배제하기 어려움 = cannot be ruled out, 의심됨 = suspicious for, 간우엽 = liver right lobe, 간좌엽 = liver left lobe, 간경변증 = cirrhosis
+
+    (glsry)
+
+    Output format: 
+    Output a json object that contains the following keys: Current exam date, Size change rate, Description of index lesion, Vessels, Risk factors.
+
+    ```(input)```
+
+  features: |
+    Objective: Provided between triple backticks is a Liver Radiology Report (CT & MRI). Extract the following features and output as JSON.
+
+    Task details:
+    1. Values for the JSON is restricted to a single number (unless explicitly allowed in the manual): 0,1
+    • 0 is negative, 1 is positive
+    • Only set a value to 1 if there is clear mention or evidence in the report.
+    • !!"Suspicious for" a feature is positive
+    2. <MANUAL> for features 
+      1) Size
+        • Allowed value is single integer
+        • Unit must be millimeters
+        • If unknown, leave blank
+        Example:
+        The liver lesion is 2.5 cm in diameter.
+        Correct value: 25
+      2) Location
+        • Allowed value is string within 3 words
+        • Described as [S1/S2/S3/S4/S5/S6/S7/S8/right/left/left lateral segment/right anterior segment/right posterior segment/right dome/bilateral/...]
+        • May use combined segments such as S3/4, S5/8, etc., for location
+        • Use the most specific description possible (for example, "Right lobe S8" should be put as "S8")
+        • Section = segment
+        • If a mass is almost replacing the right lobe, location is right lobe.
+        • If unknown, leave blank
+      3) Risk factors
+        • Present when: cirrhosis, chronic hepatitis B, CHB, HBV
+        • Negative when: Unknown, "chronic liver disease", "alcoholic liver disease"
+        • If unknown, leave blank
+      4) Rim arterial phase hyperenhancement (RimAPHE)
+        • Positive ONLY when "rim enhancement" or "peripheral enhancement" is present
+      5) Peripheral washout (PW)
+        • Positive ONLY when "peripheral washout" is present
+        Example:
+        arterially-enhancing mass in Liver S8, with washout
+        Correct value: 0
+        Example:
+        a liver mass with washout
+        Correct value: 0
+        Example:
+        arterially-enhancing mass in Liver S8, with peripheral washout
+        Correct value: 1
+      6) Delayed central enhancement (DCE)
+        • Definition: Central area of progressive postarterial phase enhancement
+        • May be expressed as centripetal enhancement
+      7) Targetoid restriction (TgtDR)
+        • Positive when: "targetoid" or "target-like" is present in the description
+        • Negative when: only "restriction" is present without "targetoid" nor "target-like"
+      8) Targetoid appearance on TP or HBP (TgtTPHBP)
+        • Synonym: EOB cloud
+        • Positive when: "targetoid" or "target-like" is present in the description along with TP or HBP
+      9) Infiltrative appearance (Infilt)
+        • Positive when either one of the exact following terms: "infiltrative", "infiltrating", "permeative"
+      10) Marked diffusion restriction (MkdDR)
+        • "Diffusion restriction" without "marked" is not "marked diffusion restriction"
+        • Do not combine "diffusion restriction" with other descriptors to make it "marked."
+        • "Diffusion restriction" without mention of "marked" should not be used to evaluate this feature.
+      11) Necrosis (Nec)
+        • Includes hemorrhagic necrosis
+      12) Severe ischemia (Isch)
+        • Present when: severe ischemia, marked ischemia
+        • Only when these adjectives are describing ischemia, NOT hemorrhagic necrosis or other related terms
+      13) Tumor-in-vein (TIV)
+        • Positive when: enhancing thrombus, vein invasion, tumor thrombus
+        • Negative when: non-enhancing thrombus
+      14) Nonrim arterial phase hyperenhancement (NonrimAPHE)
+        • Positive when: nonrim APHE, hypervascular, arterial enhancement, enhancement (without description of phase), weak or subtle enhancement
+        • Negative when: no enhancement, rim APHE, hypovascular
+      15) Nonperipheral washout (NPWO)
+        • Definition: Any degree of arterial phase enhancement, with low signal or low density in portal, delayed, transitional phase.
+        • Positive when: nonperipheral washout, washout, portal washout, delayed washout, partial washout
+        • Because phases after the portal phase are delayed and transitional phases, the expression "low signal intensity after the portal phase" is positive for NPWO.
+        Example:
+        arterially-enhancing mass in Liver S8, with washout
+        Correct value: 1
+        Example:
+        arterially-enhancing mass in Liver S8, with partial washout
+        Correct value: 1
+      16) Enhancing capsule (ECAP)
+        • Positive when: capsule, enhancing capsule, encapsulated
+        • Negative when: nonenhancing capsule
+        • IMPORTANT! "capsule" or "encapsulated" MUST BE INCLUDED IN THE REPORT
+        Example:
+        An enhancing mass in liver S8.
+        Correct value: 0
+        Example:
+        An mass with an enhancing capsule in liver S8.
+        Correct value: 1
+      17) Threshold growth (TG)
+        • USE INFO FROM Size change rate 
+        • "New" or "New in Unknown months" does not make sense. If this is encountered in Size change rate, TG is 0.
+        • Positive when: (Size change rate ≥ 50% in ≤ 6 months) OR (Size change rate = New in ≤ 24 months)
+        • Negative when: No growth, or growth but doesn't meet criteria for positive
+      18) Size stability ≥ 2yrs (SizStbl)
+        • Positive when: size unchanged for a period of at least 2 years
+      19) Size reduction (Reduction)
+        • Positive when: size decreased compared to previous study
+      20) Parallels blood pool enhancement (ParBlood)
+        • Positive when: lesion enhancement degree similar to vessels
+      21) Undistorted vessels (UnV)
+        • Positive when: vessels traversing lesion without displacement, deformation
+        • Value in the key "Vessels" must not be used to evaluate this item
+        • This refers only to vessels that traverse the liver mass, NOT other veins in general
+      22) Iron in mass > liver (Iron)
+        • Positive when: more iron in lesion relative to background liver
+      23) Marked T2 hyperintensity (MkT2)
+        • Positive when: Marked T2 high, T2 bright, high T2 signal intensity, fluid signal
+        • Negative when: Mild or moderate or intermediate T2 high
+      24) HBP isointensity (HBPi)
+        • Positive when: Intensity in hepatobiliary phase (HBP) nearly identical to liver, HBP isoenhancement, occult in HBP
+      25) Discrete nodule on US (DiscUS)
+        • Positive when: Explicitly mentioned in the report as "discrete nodule" or "discrete lesion" in the context of ultrasound (US) examination.
+      26) Subthreshold growth (sTG)
+        • Positive when: size increase, less than threshold growth
+        • Definition of threshold growth: (Size change rate ≥ 50% in ≤ 6 months) OR (Size change rate = New in ≤ 24 months)
+      27) Restricted diffusion (DR)
+        • Positive when: diffusion restriction, high signal on DWI
+      28) Mild or moderate T2 hyperintensity (mT2)
+        • Positive when: T2 hyperintensity without terms such as "marked", "very", or "bright"; Intermediate T2 hyperintensity, slight T2 high
+        • WARNING: NOT markedly high T2
+      29) Corona enhancement (Cor)
+        • IMPORTANT! Present when exact term "corona enhancement" is present
+        • NEGATIVE WHEN: "peritumoral enhancement"
+      30) Fat sparing in mass (NoFat)
+        • Definition: Paucity of fat in lesion compared to steatotic liver OR in inner nodule relative to steatotic outer nodule
+      31) Iron sparing in mass (NoIron)
+        • Definition: Paucity of iron in lesion relative to iron-overloaded liver or in inner nodule relative to outer siderotic nodule
+      32) TP hypointensity (TPlow)
+        • Positive when: liver mass is hypointense on transitional phase
+        • Do not use decriptors from other phases such as hepatobiliary phase
+      33) HBP hypointensity (HBPlow)  
+        • Positive when: liver mass is hypointense on hepatobiliary phase
+        • Synonym: HBP defect
+      34) Nonenhancing capsule (nonCAP)
+        • Positive when: Nonenhancing capsule (nonenhancing is mandatory)
+        • Negative when: Enhancing capsule, capsule
+      35) Nodule-in-nodule (NiN)
+        • Definition: Presence of smaller inner nodule within larger outer 
+      nodule
+      36) Mosaic architecture (Msc)
+        • Definition: Presence of randomly distributed internal nodules or compartments within liver mass
+        • Present when: mosaic appearance, mosaic architecture, mosaic pattern
+      37) Blood products in mass (Blood)
+        • Synonym: Intralesional hemorrhage
+        • Present when: intratumoral hemorrhage, hemorrhagic necrosis
+        Example:
+        A liver mass with severe hemorrhagic necrosis.
+        Correct value: 1
+      38) Fat in mass > liver (Fat)
+        • Definition: Increased fat within liver mass
+        • Present when: fat containing mass, fat signal is seen, fat is suspected
+    3. Refer to glossary for unknown or ambiguous terms
+    4. Please only set a value to 1 for any feature if there is an explicit mention of that feature in the report. If the report does not mention the feature or it is ambiguous, set the value to 0. 
+    5. Pay close attention to the relevant section and examples in the MANUAL. Double-check the extracted values for each key in the JSON before providing the final output.
+    6. If there's any doubt or uncertainty about a feature, it's important to double-check the relevant section in the manual to ensure the correct interpretation.
+    7. Check your response again.
+
+    (glsry)
+
+    Output format:
+    Output a json object that contains the following keys: size, location, risk_factors, RimAPHE, PW, DCE, TgtDR, TgtTPHBP, Infilt, MkdDR, Nec, SevIsch, TIV, NonrimAPHE, NPWO, ECAP, TG, SizStbl, Reduction, ParBlood, UnV, Iron, MkT2, HBPi, DiscUS, sTG, DR, mT2, Cor, NoFat, NoIron, TPlow, HBPlow, nonCAP, NiN, Msc, Blood, Fat
+
+    ```(input)```
+glossary: |
+  <Glossary>
+  {MRI Sequence Names: Hepatobiliary Phase (HBP), Transition Phase (TP), Delayed Phase (DP), Diffusion-Weighted Imaging (DWI), T1-Weighted Imaging (T1WI), T2-Weighted Imaging (T2WI)},
+  {P1 = portal vein of segment 1, P2 = portal vein of segment 2, ... (likewise through P3-8)},
+  {The phases of dynamic enhancement go in this order: precontrast, arterial, portal, delayed(transitional, 3 minute delayed), hepatobiliary.}
+  {hypointense = low signal intensity, hyperintense = high signal intensity, isointense = same signal intensity, segment = section}
+system_prompt: |
+  You are a helpful assistant. You are extremely deterministic. You can only respond in JSON format.
+
+
+
+
