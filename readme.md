@@ -1,6 +1,4 @@
-# Project Name
-
-LIRADS-GPT
+# LIRADS-GPT
 
 ## Features
 
